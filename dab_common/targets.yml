@@ -1,0 +1,19 @@
+presets:
+  tags:
+    bundle: ${bundle.name}
+    release: ${bundle.target}
+targets:
+  dev:
+    mode: development
+    default: true
+    variables:
+      catalog_suffix: _dev
+
+  prod:
+    mode: production
+    workspace:
+      # We explicitly deploy to /Workspace/Bundles to make sure we only have a single copy.
+      root_path: /Workspace/Bundles/${bundle.name}/${bundle.target}
+    variables:
+      catalog_suffix: ''
+

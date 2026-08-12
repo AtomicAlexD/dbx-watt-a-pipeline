@@ -1,0 +1,8 @@
+# Variable declarations. These variables are assigned in the dev/prod targets below.
+variables:
+  catalog_suffix:
+    description: The suffix to append to the catalog name
+    default: _dev
+  catalog_raw:
+    description: The catalog to use for loading data into the raw layer
+    default: raw${var.catalog_suffix}

@@ -1,0 +1,8 @@
+resources:
+  jobs:
+    dab_watt_a_pipeline:
+      name: dab_watt_a_pipeline
+      tasks:
+        - task_key: load_to_raw
+          notebook_task:
+            notebook_path: /Workspace/Bundles/dab_watt_a_pipeline/${bundle.target}/notebooks/dab_watt_a_pipeline_notebook

@@ -1,0 +1,8 @@
+# This is a Declarative Automation Bundle definition for dab_watt_a_pipeline.
+# See https://docs.databricks.com/dev-tools/bundles/index.html for documentation.
+bundle:
+  name: dab_watt_a_pipeline
+include:
+  - ../dab_common/*.yml
+  - resources/*.yml
+
