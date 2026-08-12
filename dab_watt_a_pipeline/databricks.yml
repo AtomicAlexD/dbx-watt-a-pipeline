@@ -6,3 +6,20 @@ include:
   - ../dab_common/*.yml
   - resources/*.yml
 
+resources:
+  schemas:
+    raw_turbine_data:
+      name: turbine_data
+      catalog_name: ${var.catalog_raw}
+      comment: Landing zone schema for raw turbine sensor data
+    bronze_turbine_data:
+      name: turbine_data
+      catalog_name: ${var.catalog_bronze}
+      comment: Bronze layer schema for cleaned/ingested turbine data
+
+  volumes:
+    landing:
+      name: landing
+      catalog_name: ${var.catalog_raw}
+      schema_name: ${resources.schemas.raw_turbine_data.name}
+      comment: Managed volume for raw CSV landing files

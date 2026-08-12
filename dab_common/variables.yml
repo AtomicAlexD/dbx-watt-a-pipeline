@@ -6,3 +6,12 @@ variables:
   catalog_raw:
     description: The catalog to use for loading data into the raw layer
     default: raw${var.catalog_suffix}
+  catalog_bronze:
+    description: The catalog to use for loading data into the bronze layer
+    default: bronze${var.catalog_suffix}
+  catalog_silver:
+    description: The catalog to use for loading data into the silver layer
+    default: silver${var.catalog_suffix}
+  catalog_gold:
+    description: The catalog to use for loading data into the gold layer
+    default: gold${var.catalog_suffix}

@@ -1,8 +1,12 @@
 resources:
-  jobs:
-    dab_watt_a_pipeline:
-      name: dab_watt_a_pipeline
-      tasks:
-        - task_key: load_to_raw
-          notebook_task:
-            notebook_path: /Workspace/Bundles/dab_watt_a_pipeline/${bundle.target}/notebooks/dab_watt_a_pipeline_notebook
+  pipelines:
+    turbine_bronze:
+      name: turbine_bronze_ingest
+      catalog: ${var.catalog_bronze}
+      schema: ${resources.schemas.bronze_turbine_data.name}
+      serverless: true
+      configuration:
+        turbine_pipeline.landing_volume_path: /Volumes/${var.catalog_raw}/${resources.schemas.raw_turbine_data.name}/landing
+      libraries:
+        - file:
+            path: ../src/turbine_data/extract_raw.py
