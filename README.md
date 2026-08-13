@@ -1,5 +1,7 @@
 # watt-a-pipeline ⚡
 
+Lots to read here but if you are just interested in my thought process skip down to Development notes, should be a laugh. For reference this project was AI assisted, use it in my day job so saw fit to use it here.
+
 A Medallion-architecture (Bronze/Silver/Gold) data pipeline for cleaning, validating, and
 analyzing wind turbine sensor data — built with PySpark and Lakeflow Declarative Pipelines
 on Databricks, deployed via Databricks Asset Bundles.
@@ -217,3 +219,14 @@ select * from gold_dev.dev_atedimmock_turbine_data.daily_turbine_summary where i
 Not gunna lie, was a tad lazy on test generation, the main thing is they work and they cover all my examples, also with the test sheet I can load that helps me visualise issues. Feel like that's my approval gate, running some SQL against the results and having a gander.
 
 Last minute addition to the silver mat view, decided to show how I would partition or add additional properties for auto compact etc. It's not an after thought but the data volumes right now are so small it's hard to prove how much they would help.
+
+Also decided to throw in an app, I think I might have got it working in dev and prod but didn't want to waste too much time on it.
+
+Added some screenshots at the end to show the app and pipeline running but they are what they are.
+
+
+Things I wish i'd done:
+- Tags for all my tables, proper descriptions to help with the ontology.
+- ODCS data contract with DQX data quality checks, would have been cool to do some quarantine of bad data etc.
+- Played around with the app more, i've done way more complex apps with OBO auth and not have them with hardcoded SQL but time limits.
+- I was going to get a mate to test and see if they could deploy and get this running but no luck. No christmas card for him.
