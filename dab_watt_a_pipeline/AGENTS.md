@@ -21,5 +21,4 @@ If the CLI is not installed, see: https://docs.databricks.com/dev-tools/cli/inst
 ---
 
 ## Project Instructions
-
-<!-- Add your project-specific instructions, coding conventions, or notes here -->
+Didn't actually use claude code here or copilot, just used claude desktop for some reason so never generated this, felt I could do more stuff myself then, i'd populate this if I knew someoneone was going to contribute.
