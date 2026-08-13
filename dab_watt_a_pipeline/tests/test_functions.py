@@ -1,22 +1,22 @@
 """
-Tests for silver-layer cleaning transformations (functions.py).
+Tests for silver and gold layer transformations (functions.py).
 
 Testing philosophy: each test proves one specific claim about the
 production code's behavior, stated in the docstring rather than left
 implicit. Where a test exists because of a real bug found during
-development (not just an anticipated edge case), that's named explicitly
-as a regression test — it's evidence the logic was actually exercised
-against tricky cases, not just written to spec.
+development, or guards a non-obvious correctness decision, that's named
+explicitly as a regression test — evidence the logic was actually
+exercised against tricky cases, not just written to spec.
 
 One test class per function in functions.py, mirroring that file 1:1.
 """
 
 import logging
-from datetime import datetime
+from datetime import date, datetime
 
 import pytest
 from pyspark.sql.types import (
-    StructType, StructField, IntegerType, DoubleType, TimestampType
+    StructType, StructField, IntegerType, DoubleType, TimestampType, BooleanType
 )
 
 from src.turbine_data.functions import (
@@ -24,6 +24,8 @@ from src.turbine_data.functions import (
     flag_and_nullify_invalid,
     impute_missing_values,
     report_remaining_nulls,
+    compute_daily_summary,
+    flag_anomalies,
 )
 
 
@@ -340,3 +342,244 @@ class TestReportRemainingNulls:
             report_remaining_nulls(df)
 
         assert len(caplog.records) == 0
+
+
+class TestComputeDailySummary:
+    """Contract: one row per (turbine_id, date) with min/max/avg
+    power_output and a row count. Imputed values are included in the
+    aggregation (see functions.py module docstring for why that's safe)
+    but counted separately via imputed_count, so a heavily-fabricated
+    day is visible rather than silently blended into a normal-looking
+    average."""
+
+    SCHEMA = StructType([
+        StructField("turbine_id", IntegerType()),
+        StructField("timestamp", TimestampType()),
+        StructField("power_output", DoubleType()),
+        StructField("power_output_was_imputed", BooleanType()),
+    ])
+
+    def _row(self, turbine_id, ts, power, imputed=False):
+        return (turbine_id, ts, power, imputed)
+
+    def test_min_max_avg_computed_correctly(self, spark):
+        """The core contract, checked against hand-calculated values —
+        not just 'a number came out', but the specific right number."""
+        df = spark.createDataFrame(
+            [
+                self._row(1, datetime(2026, 1, 1, 0), 2.0),
+                self._row(1, datetime(2026, 1, 1, 1), 4.0),
+                self._row(1, datetime(2026, 1, 1, 2), 3.0),
+            ],
+            schema=self.SCHEMA,
+        )
+
+        result = compute_daily_summary(df).collect()[0]
+
+        assert result["min_power_output"] == 2.0
+        assert result["max_power_output"] == 4.0
+        assert result["avg_power_output"] == pytest.approx(3.0)
+        assert result["reading_count"] == 3
+
+    def test_imputed_count_reflects_flagged_rows(self, spark):
+        """Proves imputed_count is a genuine sum of the flag, not just
+        always zero or always equal to reading_count."""
+        df = spark.createDataFrame(
+            [
+                self._row(1, datetime(2026, 1, 1, 0), 2.0, imputed=False),
+                self._row(1, datetime(2026, 1, 1, 1), 2.0, imputed=True),
+                self._row(1, datetime(2026, 1, 1, 2), 3.0, imputed=False),
+            ],
+            schema=self.SCHEMA,
+        )
+
+        result = compute_daily_summary(df).collect()[0]
+
+        assert result["reading_count"] == 3
+        assert result["imputed_count"] == 1
+
+    def test_imputed_row_repeating_an_existing_value_does_not_change_min_or_max(self, spark):
+        """Documents the specific claim the module docstring makes:
+        forward-fill can only repeat a value that already occurred
+        earlier that day, so including imputed rows in the aggregation
+        cannot introduce a new min or max. Here the imputed row repeats
+        the day's max — min/max stay exactly what they'd be without it,
+        only reading_count and imputed_count change."""
+        df = spark.createDataFrame(
+            [
+                self._row(1, datetime(2026, 1, 1, 0), 2.0, imputed=False),
+                self._row(1, datetime(2026, 1, 1, 1), 4.0, imputed=False),  # true max
+                self._row(1, datetime(2026, 1, 1, 2), 4.0, imputed=True),   # repeats max via fill
+            ],
+            schema=self.SCHEMA,
+        )
+
+        result = compute_daily_summary(df).collect()[0]
+
+        assert result["max_power_output"] == 4.0
+        assert result["min_power_output"] == 2.0
+        assert result["reading_count"] == 3
+        assert result["imputed_count"] == 1
+
+    def test_turbines_and_days_are_grouped_separately(self, spark):
+        """Proves the groupBy is on (turbine_id, date) together, not
+        either alone — different turbines and different days must not
+        get blended into the same summary row."""
+        df = spark.createDataFrame(
+            [
+                self._row(1, datetime(2026, 1, 1, 0), 2.0),
+                self._row(1, datetime(2026, 1, 2, 0), 8.0),  # same turbine, next day
+                self._row(2, datetime(2026, 1, 1, 0), 5.0),  # same day, other turbine
+            ],
+            schema=self.SCHEMA,
+        )
+
+        result = {
+            (r["turbine_id"], r["date"]): r for r in compute_daily_summary(df).collect()
+        }
+
+        assert len(result) == 3
+        assert result[(1, date(2026, 1, 1))]["avg_power_output"] == 2.0
+        assert result[(1, date(2026, 1, 2))]["avg_power_output"] == 8.0
+        assert result[(2, date(2026, 1, 1))]["avg_power_output"] == 5.0
+
+
+class TestFlagAnomalies:
+    """Contract: real (non-imputed) readings are flagged when
+    power_output falls outside mean +/- 2 stddev of that turbine's own
+    readings for that day. Imputed rows are excluded entirely — absent
+    from the output, not merely unflagged — and are never counted
+    toward the mean/stddev either."""
+
+    SCHEMA = StructType([
+        StructField("turbine_id", IntegerType()),
+        StructField("timestamp", TimestampType()),
+        StructField("power_output", DoubleType()),
+        StructField("power_output_was_imputed", BooleanType()),
+    ])
+
+    def _row(self, turbine_id, ts, power, imputed=False):
+        return (turbine_id, ts, power, imputed)
+
+    def test_reading_far_below_mean_is_flagged(self, spark):
+        """Hand-calculable known-answer case: five readings at 3.0, one
+        at 1.0. The lone outlier pulls the mean down and defines the
+        spread, so this checks the flag correctly identifies it as the
+        outlier relative to the group, not against a hardcoded number."""
+        values = [1.0, 3.0, 3.0, 3.0, 3.0, 3.0]
+        df = spark.createDataFrame(
+            [self._row(1, datetime(2026, 1, 1, h), v) for h, v in enumerate(values)],
+            schema=self.SCHEMA,
+        )
+
+        result = {r["power_output"]: r for r in flag_anomalies(df).collect()}
+
+        assert result[1.0]["is_anomaly"] is True
+        assert result[3.0]["is_anomaly"] is False
+
+    def test_reading_within_bounds_is_not_flagged(self, spark):
+        """Negative-space test: ordinary variation within 2 stddev must
+        not be flagged, or the threshold would be useless noise."""
+        values = [2.9, 3.0, 3.1, 3.0, 2.95, 3.05]
+        df = spark.createDataFrame(
+            [self._row(1, datetime(2026, 1, 1, h), v) for h, v in enumerate(values)],
+            schema=self.SCHEMA,
+        )
+
+        result = flag_anomalies(df).collect()
+
+        assert not any(r["is_anomaly"] for r in result)
+
+    def test_anomaly_check_is_symmetric_high_and_low(self, spark):
+        """Proves a spike above the mean is caught just as reliably as
+        a dip below it — the check is on absolute distance, not just
+        underperformance."""
+        values = [3.0, 3.0, 3.0, 3.0, 3.0, 9.0]  # one high outlier
+        df = spark.createDataFrame(
+            [self._row(1, datetime(2026, 1, 1, h), v) for h, v in enumerate(values)],
+            schema=self.SCHEMA,
+        )
+
+        result = {r["power_output"]: r for r in flag_anomalies(df).collect()}
+
+        assert result[9.0]["is_anomaly"] is True
+        assert result[3.0]["is_anomaly"] is False
+
+    def test_imputed_rows_are_excluded_from_output_entirely(self, spark):
+        """Proves imputed rows aren't just unflagged but absent from
+        the result set — the anomaly table should never contain a
+        fabricated reading passed off as real."""
+        df = spark.createDataFrame(
+            [
+                self._row(1, datetime(2026, 1, 1, 0), 3.0, imputed=False),
+                self._row(1, datetime(2026, 1, 1, 1), 3.0, imputed=False),
+                self._row(1, datetime(2026, 1, 1, 2), 3.0, imputed=True),
+            ],
+            schema=self.SCHEMA,
+        )
+
+        result = flag_anomalies(df).collect()
+
+        assert len(result) == 2
+        assert all(r["power_output_was_imputed"] is False for r in result)
+
+    def test_imputed_rows_do_not_skew_the_mean_or_stddev(self, spark):
+        """Regression-shaped guard: an imputed value repeating an
+        earlier real reading would, if included, artificially tighten
+        the day's variance. Here five real readings vary normally, and
+        five imputed rows all repeat one of them — if imputed rows were
+        wrongly included in the stats, this would shrink stddev and
+        cause false positives among the real readings. Proves the real
+        readings remain unflagged despite the imputed noise sitting
+        alongside them."""
+        real_values = [2.5, 3.5, 2.8, 3.2, 3.0]
+        rows = [self._row(1, datetime(2026, 1, 1, h), v) for h, v in enumerate(real_values)]
+        rows += [
+            self._row(1, datetime(2026, 1, 1, 10 + h), 3.0, imputed=True) for h in range(5)
+        ]
+        df = spark.createDataFrame(rows, schema=self.SCHEMA)
+
+        result = flag_anomalies(df).collect()
+
+        assert len(result) == 5  # only the real readings
+        assert not any(r["is_anomaly"] for r in result)
+
+    def test_single_real_reading_day_is_not_flagged(self, spark):
+        """Regression-shaped guard: a turbine-day with only one real
+        reading has an undefined (null) standard deviation in Spark.
+        Without an explicit guard, comparing against a null threshold
+        would propagate null rather than a clean True/False. Proves
+        is_anomaly resolves to False, not null, when there's not enough
+        data to judge."""
+        df = spark.createDataFrame(
+            [self._row(1, datetime(2026, 1, 1, 0), 3.0)],
+            schema=self.SCHEMA,
+        )
+
+        result = flag_anomalies(df).collect()[0]
+
+        assert result["is_anomaly"] is False  # not None
+
+    def test_anomaly_stats_are_scoped_per_turbine_and_day(self, spark):
+        """A turbine's stats must not be computed against another
+        turbine's readings, or a different day's readings, even when
+        both are present in the same input DataFrame."""
+        df = spark.createDataFrame(
+            [
+                # Turbine 1, day 1: tight cluster around 3.0
+                self._row(1, datetime(2026, 1, 1, 0), 2.9),
+                self._row(1, datetime(2026, 1, 1, 1), 3.0),
+                self._row(1, datetime(2026, 1, 1, 2), 3.1),
+                # Turbine 2, same day: naturally much higher baseline —
+                # would look anomalous against turbine 1's stats, but
+                # shouldn't be flagged against its own.
+                self._row(2, datetime(2026, 1, 1, 0), 9.0),
+                self._row(2, datetime(2026, 1, 1, 1), 9.1),
+                self._row(2, datetime(2026, 1, 1, 2), 8.9),
+            ],
+            schema=self.SCHEMA,
+        )
+
+        result = flag_anomalies(df).collect()
+
+        assert not any(r["is_anomaly"] for r in result)

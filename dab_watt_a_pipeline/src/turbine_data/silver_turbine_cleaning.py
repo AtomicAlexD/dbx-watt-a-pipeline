@@ -1,4 +1,5 @@
 from pyspark import pipelines as dp
+from pyspark.sql import functions as F
 
 from functions import clean_turbine_readings, report_remaining_nulls
 
@@ -11,6 +12,12 @@ _silver_schema = spark.conf.get("turbine_pipeline.silver_schema")
 
 @dp.materialized_view(
     name=f"{_silver_catalog}.{_silver_schema}.silver_turbine_readings",
+    # Examples of some of the options available to materialized_view for performance tuning.
+    partition_cols=["date"],
+    table_properties={
+        "delta.autoOptimize.optimizeWrite": "true",
+        "delta.autoOptimize.autoCompact": "true",
+    },
     comment=(
         "Cleaned turbine sensor readings: deduplicated by (turbine_id, "
         "timestamp), physically invalid values nulled and flagged, "
@@ -21,7 +28,8 @@ _silver_schema = spark.conf.get("turbine_pipeline.silver_schema")
 )
 def silver_turbine_readings():
     bronze_df = spark.read.table("bronze_turbine_readings")
-    cleaned_df = clean_turbine_readings(bronze_df)
+    cleaned_df = clean_turbine_readings(bronze_df).withColumn("date", F.to_date("timestamp"))
+    
     report_remaining_nulls(cleaned_df)
 
     return cleaned_df

@@ -1,0 +1,11 @@
+resources:
+  apps:
+    turbine_health_app:
+      name: ${var.app_name}
+      description: "Broken turbine dashboard reading Silver/Gold audit flags"
+      source_code_path: ../app
+      resources:
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: CAN_USE

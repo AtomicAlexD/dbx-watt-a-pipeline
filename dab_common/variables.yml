@@ -15,3 +15,8 @@ variables:
   catalog_gold:
     description: The catalog to use for loading data into the gold layer
     default: gold${var.catalog_suffix}
+  warehouse_id:
+    description: "SQL warehouse ID used by the turbine health app"
+    default: 995bdd384ef692f6
+  app_name:
+    description: "Name of the turbine health Databricks App"

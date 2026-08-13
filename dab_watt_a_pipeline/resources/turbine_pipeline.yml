@@ -1,7 +1,7 @@
 resources:
   pipelines:
     turbine_bronze:
-      name: turbine_bronze_ingest
+      name: turbine_data_ingest
       catalog: ${var.catalog_bronze}
       schema: ${resources.schemas.bronze_turbine_data.name}
       serverless: true
@@ -9,8 +9,12 @@ resources:
         turbine_pipeline.landing_volume_path: /Volumes/${var.catalog_raw}/${resources.schemas.raw_turbine_data.name}/landing
         turbine_pipeline.silver_catalog: ${var.catalog_silver}
         turbine_pipeline.silver_schema: ${resources.schemas.silver_turbine_data.name}
+        turbine_pipeline.gold_catalog: ${var.catalog_gold}
+        turbine_pipeline.gold_schema: ${resources.schemas.gold_turbine_data.name}
       libraries:
         - file:
             path: ../src/turbine_data/extract_raw.py
         - file:
             path: ../src/turbine_data/silver_turbine_cleaning.py
+        - file:
+            path: ../src/turbine_data/gold_turbine_aggregates.py
