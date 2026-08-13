@@ -50,7 +50,7 @@ databricks bundle deploy -t prod --profile <profile>     # deploy to prod
 ## Running the pipeline
 
 ```bash
-databricks bundle run turbine_bronze --profile <profile>
+databricks bundle run turbine_data --profile <profile>
 ```
 
 This runs the full Bronze → Silver → Gold pipeline in one go (all three layers are defined
