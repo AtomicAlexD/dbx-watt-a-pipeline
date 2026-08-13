@@ -230,3 +230,4 @@ Things I wish i'd done:
 - ODCS data contract with DQX data quality checks, would have been cool to do some quarantine of bad data etc.
 - Played around with the app more, i've done way more complex apps with OBO auth and not have them with hardcoded SQL but time limits.
 - I was going to get a mate to test and see if they could deploy and get this running but no luck. No christmas card for him.
+- Would have loved to load test this, was half tempted to try generate half a million rows and throw it at it but time and cost on my free workspace prevented me.
