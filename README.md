@@ -224,7 +224,6 @@ Also decided to throw in an app, I think I might have got it working in dev and 
 
 Added some screenshots at the end to show the app and pipeline running but they are what they are.
 
-
 Things I wish i'd done:
 - Tags for all my tables, proper descriptions to help with the ontology.
 - ODCS data contract with DQX data quality checks, would have been cool to do some quarantine of bad data etc.
