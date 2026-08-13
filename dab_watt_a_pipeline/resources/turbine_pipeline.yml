@@ -7,6 +7,10 @@ resources:
       serverless: true
       configuration:
         turbine_pipeline.landing_volume_path: /Volumes/${var.catalog_raw}/${resources.schemas.raw_turbine_data.name}/landing
+        turbine_pipeline.silver_catalog: ${var.catalog_silver}
+        turbine_pipeline.silver_schema: ${resources.schemas.silver_turbine_data.name}
       libraries:
         - file:
             path: ../src/turbine_data/extract_raw.py
+        - file:
+            path: ../src/turbine_data/silver_turbine_cleaning.py

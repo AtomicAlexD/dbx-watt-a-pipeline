@@ -15,7 +15,15 @@ resources:
     bronze_turbine_data:
       name: turbine_data
       catalog_name: ${var.catalog_bronze}
-      comment: Bronze layer schema for cleaned/ingested turbine data
+      comment: Bronze layer schema for ingested turbine data
+    silver_turbine_data:
+      name: turbine_data
+      catalog_name: ${var.catalog_silver}
+      comment: Silver layer schema for cleaned and imputed turbine data
+    gold_turbine_data:
+      name: turbine_data
+      catalog_name: ${var.catalog_gold}
+      comment: Gold layer schema for aggregated turbine data
 
   volumes:
     landing:
