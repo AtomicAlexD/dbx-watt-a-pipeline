@@ -4,6 +4,14 @@ resources:
       name: ${var.app_name}
       description: "Broken turbine dashboard reading Silver/Gold audit flags"
       source_code_path: ../app
+      config:
+        env:
+          - name: SILVER_TABLE
+            value: '${var.catalog_silver}.turbine_data.silver_turbine_readings'
+          - name: GOLD_SUMMARY_TABLE
+            value: '${var.catalog_gold}.turbine_data.daily_turbine_summary'
+          - name: GOLD_ANOMALIES_TABLE
+            value: '${var.catalog_gold}.turbine_data.turbine_anomalies'
       resources:
         - name: sql-warehouse
           sql_warehouse:
