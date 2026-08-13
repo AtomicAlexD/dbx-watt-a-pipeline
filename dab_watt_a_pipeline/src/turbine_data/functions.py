@@ -1,4 +1,14 @@
 """
+----------------------------------------------
+FULLY AWARE THE DOC STRINGS AND COMMENTS ARE LONG.
+
+left them mainly because it helps with context and understanding of the design decisions, 
+but also because the main questions are around data quality in this brief so I wanted to 
+make sure the reasoning was clear and auditable. Also i'm fully expecting an AI to be pointed 
+at the repo so the context will help it understand the design decisions and reasoning behind 
+the code.
+-------------------------------------------------------
+
 Silver and Gold layer transformations for turbine sensor readings.
 
 Every function here is pure: DataFrame in, DataFrame out (or, for
