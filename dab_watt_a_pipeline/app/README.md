@@ -10,3 +10,5 @@ You'll need to go and manually start the app and point at the app folder in the 
 And don't forget to grant the apps SP access to the tables, would have used OBO but again way too much for such a small demo.
 
 The App should pick up table locations from the bundle deploy but if it's wrong check the defaults in the resources/app.yml
+
+#TODO add in an easter egg
